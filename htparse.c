@@ -404,6 +404,11 @@ htparser_should_keep_alive(htparser * p) {
     return 0;
 }
 
+htp_type
+htparser_get_type(htparser * p) {
+    return p->type;
+}
+
 htp_scheme
 htparser_get_scheme(htparser * p) {
     return p->scheme;
@@ -1816,9 +1821,12 @@ hdrline_start:
                     case LF:
                         res = hook_on_hdrs_complete_run(p, hooks);
 
-                        if (res) {
+                        if (res < 0) {
                             p->error = htparse_error_user;
                             return i + 1;
+                        }
+                        else if (res > 0) {
+                            p->flags |= parser_flag_trailing;
                         }
 
 

@@ -96,6 +96,7 @@ struct htparse_hooks {
 
 EVHTP_EXPORT size_t         htparser_run(htparser *, htparse_hooks *, const char *, size_t);
 EVHTP_EXPORT int            htparser_should_keep_alive(htparser * p);
+EVHTP_EXPORT htp_type       htparser_get_type(htparser *);
 EVHTP_EXPORT htp_scheme     htparser_get_scheme(htparser *);
 EVHTP_EXPORT htp_method     htparser_get_method(htparser *);
 EVHTP_EXPORT const char   * htparser_get_methodstr(htparser *);

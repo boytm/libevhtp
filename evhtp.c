@@ -1429,6 +1429,10 @@ _evhtp_request_parser_headers(htparser * p) {
     if (c->request->status != EVHTP_RES_OK) {
         return -1;
     }
+    if (evhtp_unlikely(c->request->method == htp_method_HEAD &&
+                htparser_get_type(p) == htp_type_response)) { 
+        return 1; /* HEAD, skip response body */
+    }
 
     if (c->type == evhtp_type_server && c->htp->disable_100_cont == 0) {
         /* only send a 100 continue response if it hasn't been disabled via
@@ -1650,7 +1654,7 @@ _evhtp_create_reply(evhtp_request_t * request, evhtp_res code) {
         goto check_proto;
     }
 
-    if (out_len && request->chunked == 0) {
+    if ((out_len || request->keepalive == 1) && request->chunked == 0) {
         /* add extra headers (like content-length/type) if not already present */
 
         if (!evhtp_header_find(request->headers_out, "Content-Length")) {
@@ -4351,6 +4355,7 @@ evhtp_make_request(evhtp_connection_t * c, evhtp_request_t * r,
 
     obuf       = bufferevent_get_output(c->bev);
     r->conn    = c;
+    r->method  = meth;
     c->request = r;
 
     switch (r->proto) {
