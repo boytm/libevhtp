@@ -1962,6 +1962,8 @@ _evhtp_connection_eventcb(evbev_t * bev, short events, void * arg) {
             errno = 0;
 
             return;
+        } else {
+            htparser_run(c->parser, &request_psets, (const char *)NULL, 0);
         }
     }
 

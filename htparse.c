@@ -38,6 +38,7 @@
 #define LF               (unsigned char)10
 #define CR               (unsigned char)13
 #define CRLF             "\x0d\x0a"
+#define LENGTH_UNTIL_EOF (UINT64_MAX)
 
 enum eval_hdr_val {
     eval_hdr_val_none = 0,
@@ -91,6 +92,7 @@ enum parser_state {
     s_hdrline_almost_done,
     s_hdrline_done,
     s_body_read,
+    s_body_read_eof,
     s_chunk_size_start,
     s_chunk_size,
     s_chunk_size_almost_done,
@@ -620,6 +622,19 @@ htparser_run(htparser * p, htparse_hooks * hooks, const char * data, size_t len)
     p->error      = htparse_error_none;
     p->bytes_read = 0;
 
+    if (evhtp_unlikely(len == 0 || data == NULL)) {
+        int res = 0;
+        if (p->state == s_body_read_eof) {
+            res      = hook_on_msg_complete_run(p, hooks);
+            p->state = s_start;
+        }
+
+        if (res) {
+            p->error = htparse_error_user;
+        }
+        return 0;
+    }
+
     for (i = 0; i < len; i++) {
         int res;
         int err;
@@ -656,7 +671,7 @@ htparser_run(htparser * p, htparse_hooks * hooks, const char * data, size_t len)
                 p->multipart         = 0;
                 p->major             = 0;
                 p->minor             = 0;
-                p->content_len       = 0;
+                p->content_len       = (p->type == htp_type_request) ? 0 : LENGTH_UNTIL_EOF;
                 p->orig_content_len  = 0;
                 p->status            = 0;
                 p->status_count      = 0;
@@ -1838,6 +1853,8 @@ hdrline_start:
                             p->state = s_start;
                         } else if (p->flags & parser_flag_chunked) {
                             p->state = s_chunk_size_start;
+                        } else if (p->content_len == LENGTH_UNTIL_EOF) {
+                            p->state = s_body_read_eof;
                         } else if (p->content_len > 0) {
                             p->state = s_body_read;
                         } else if (p->content_len == 0) {
@@ -2014,6 +2031,28 @@ hdrline_start:
                     if (p->content_len == 0) {
                         res      = hook_on_msg_complete_run(p, hooks);
                         p->state = s_start;
+                    }
+
+                    if (res) {
+                        p->error = htparse_error_user;
+                        return i + 1;
+                    }
+                }
+
+                break;
+
+            case s_body_read_eof:
+                res = 0;
+
+                {
+                    const char * pp      = &data[i];
+                    const char * pe      = (const char *)(data + len);
+                    size_t       to_read = pe - pp;
+
+                    if (to_read > 0) {
+                        res = hook_body_run(p, hooks, pp, to_read);
+
+                        i  += to_read - 1;
                     }
 
                     if (res) {
