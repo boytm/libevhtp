@@ -1654,17 +1654,24 @@ _evhtp_create_reply(evhtp_request_t * request, evhtp_res code) {
         goto check_proto;
     }
 
-    if ((out_len || request->keepalive == 1) && request->chunked == 0) {
+    if (request->chunked == 0) {
         /* add extra headers (like content-length/type) if not already present */
 
         if (!evhtp_header_find(request->headers_out, "Content-Length")) {
-            /* convert the buffer_out length to a string and set
-             * and add the new Content-Length header.
-             */
-            evhtp_modp_sizetoa(out_len, out_buf);
+            if (request->finished == 1) {
+                /* convert the buffer_out length to a string and set
+                 * and add the new Content-Length header.
+                 */
+                evhtp_modp_sizetoa(out_len, out_buf);
 
-            evhtp_headers_add_header(request->headers_out,
-                                     evhtp_header_new("Content-Length", out_buf, 0, 1));
+                evhtp_headers_add_header(request->headers_out,
+                        evhtp_header_new("Content-Length", out_buf, 0, 1));
+            } else {
+                /* asynchronous response without Content-Length, 
+                 * so must close socket to indicate the end of body 
+                 */
+                request->keepalive = 0; 
+            }
         }
     }
 check_proto:
