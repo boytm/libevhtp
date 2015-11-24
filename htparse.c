@@ -1524,7 +1524,7 @@ hdrline_start:
 
                         switch (p->buf_idx + 1) {
                             case 5:
-                                if (!strcasecmp(p->buf, "host")) {
+                                if (!strcasecmp(p->buf, "host") && p->type == htp_type_request) {
                                     p->heval = eval_hdr_val_hostname;
                                 }
                                 break;
