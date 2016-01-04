@@ -4239,6 +4239,33 @@ evhtp_free(evhtp_t * evhtp) {
 *****************************************************************/
 
 evhtp_connection_t *
+evhtp_connection_new_from_bev(evbev_t * bev) {
+	evhtp_connection_t * conn;
+	int                  err;
+
+	evhtp_assert(bev != NULL);
+
+	if (!(conn = _evhtp_connection_new(NULL, -1, evhtp_type_client))) {
+		return NULL;
+	}
+
+	conn->evbase = bufferevent_get_base(bev);
+	conn->bev    = bev;
+
+	/*if (evhtp_likely(c->type == evhtp_type_client))*/ {
+		conn->connected = 1;
+		bufferevent_setcb(bev,
+			_evhtp_connection_readcb,
+			_evhtp_connection_writecb,
+			_evhtp_connection_eventcb, conn);
+
+		bufferevent_enable(conn->bev, EV_READ);
+	}
+
+	return conn;
+}
+
+evhtp_connection_t *
 evhtp_connection_new(evbase_t * evbase, const char * addr, uint16_t port) {
     return evhtp_connection_new_dns(evbase, NULL, addr, port);
 }
@@ -4277,12 +4304,12 @@ evhtp_connection_new_dns(evbase_t * evbase, struct evdns_base * dns_base,
         struct sockaddr   * sin;
         int                 salen;
 
-        if (inet_pton(AF_INET, addr, &sin4.sin_addr)) {
+        if (evutil_inet_pton(AF_INET, addr, &sin4.sin_addr)) {
             sin4.sin_family = AF_INET;
             sin4.sin_port   = htons(port);
             sin = (struct sockaddr *)&sin4;
             salen           = sizeof(sin4);
-        } else if (inet_pton(AF_INET6, addr, &sin6.sin6_addr)) {
+        } else if (evutil_inet_pton(AF_INET6, addr, &sin6.sin6_addr)) {
             sin6.sin6_family = AF_INET6;
             sin6.sin6_port   = htons(port);
             sin = (struct sockaddr *)&sin6;
