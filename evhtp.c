@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -3013,6 +3012,8 @@ error:
     evhtp_safe_free(val_buf, free);
 #endif
 
+    evhtp_query_free(query_args);
+
     return NULL;
 }     /* evhtp_parse_query */
 
@@ -3058,6 +3059,7 @@ void
 evhtp_send_reply(evhtp_request_t * request, evhtp_res code) {
     evhtp_connection_t * c;
     evbuf_t            * reply_buf;
+    struct bufferevent * bev;
 
     c = evhtp_request_get_connection(request);
     request->finished = 1;
@@ -3068,7 +3070,14 @@ evhtp_send_reply(evhtp_request_t * request, evhtp_res code) {
         return;
     }
 
-    bufferevent_write_buffer(evhtp_connection_get_bev(c), reply_buf);
+    bev = evhtp_connection_get_bev(c);
+
+    bufferevent_lock(bev);
+    {
+        bufferevent_write_buffer(bev, reply_buf);
+    }
+    bufferevent_unlock(bev);
+
     evbuffer_drain(reply_buf, -1);
     /* evbuffer_free(reply_buf); */
 }
@@ -3192,6 +3201,58 @@ evhtp_unbind_socket(evhtp_t * htp) {
 }
 
 int
+evhtp_accept_socket(evhtp_t * htp, evutil_socket_t sock, int backlog) {
+    int on = 1;
+
+    evhtp_assert(htp != NULL);
+
+    if (sock == -1) {
+        return -1;
+    }
+
+#if defined SO_REUSEPORT
+    if (htp->enable_reuseport) {
+        setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (void *)&on, sizeof(on));
+    }
+#endif
+
+#if defined TCP_NODELAY
+    if (htp->enable_nodelay == 1) {
+        setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void *)&on, sizeof(on));
+    }
+#endif
+
+#if defined TCP_DEFER_ACCEPT
+    if (htp->enable_defer_accept == 1) {
+        setsockopt(sock, IPPROTO_TCP, TCP_DEFER_ACCEPT, (void *)&on, sizeof(on));
+    }
+#endif
+
+    htp->server = evconnlistener_new(htp->evbase, _evhtp_accept_cb, htp,
+                                     LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
+                                     backlog, sock);
+
+    if (htp->server == NULL) {
+        return -1;
+    }
+
+#ifndef EVHTP_DISABLE_SSL
+    if (htp->ssl_ctx != NULL) {
+        /* if ssl is enabled and we have virtual hosts, set our servername
+         * callback. We do this here because we want to make sure that this gets
+         * set after all potential virtualhosts have been set, not just after
+         * ssl_init.
+         */
+        if (TAILQ_FIRST(&htp->vhosts) != NULL) {
+            SSL_CTX_set_tlsext_servername_callback(htp->ssl_ctx,
+                                                   _evhtp_ssl_servername);
+        }
+    }
+#endif
+    return 0;
+} /* evhtp_accept_socket */
+
+int
 evhtp_bind_sockaddr(evhtp_t * htp, struct sockaddr * sa, size_t sin_len, int backlog) {
 #ifndef WIN32
     signal(SIGPIPE, SIG_IGN);
@@ -3215,46 +3276,11 @@ evhtp_bind_sockaddr(evhtp_t * htp, struct sockaddr * sa, size_t sin_len, int bac
         evhtp_errno_assert(rc != -1);
     }
 
-#if defined SO_REUSEPORT
-    if (htp->enable_reuseport) {
-        setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (void *)&on, sizeof(on));
+    if (bind(fd, sa, sin_len) == -1) {
+        return -1;
     }
-#endif
 
-#if defined TCP_NODELAY
-    if (htp->enable_nodelay == 1) {
-        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&on, sizeof(on));
-    }
-#endif
-
-#if defined TCP_DEFER_ACCEPT
-    if (htp->enable_defer_accept == 1) {
-        setsockopt(fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, (void *)&on, sizeof(on));
-    }
-#endif
-
-    evhtp_errno_assert(bind(fd, sa, sin_len) != -1);
-
-    htp->server = evconnlistener_new(htp->evbase, _evhtp_accept_cb, htp,
-                                     LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE,
-                                     backlog, fd);
-    evhtp_errno_assert(htp->server != NULL);
-
-#ifndef EVHTP_DISABLE_SSL
-    if (htp->ssl_ctx != NULL) {
-        /* if ssl is enabled and we have virtual hosts, set our servername
-         * callback. We do this here because we want to make sure that this gets
-         * set after all potential virtualhosts have been set, not just after
-         * ssl_init.
-         */
-        if (TAILQ_FIRST(&htp->vhosts) != NULL) {
-            SSL_CTX_set_tlsext_servername_callback(htp->ssl_ctx,
-                                                   _evhtp_ssl_servername);
-        }
-    }
-#endif
-
-    return 0;
+    return evhtp_accept_socket(htp, fd, backlog);
 } /* evhtp_bind_sockaddr */
 
 int
@@ -3612,26 +3638,59 @@ _evhtp_thread_init(evthr_t * thr, void * arg) {
     evhtp_t * htp = (evhtp_t *)arg;
 
     if (htp->thread_init_cb) {
-        htp->thread_init_cb(htp, thr, htp->thread_init_cbarg);
+        htp->thread_init_cb(htp, thr, htp->thread_cbarg);
     }
 }
 
-int
-evhtp_use_threads(evhtp_t * htp, evhtp_thread_init_cb init_cb, int nthreads, void * arg) {
-    htp->thread_init_cb    = init_cb;
-    htp->thread_init_cbarg = arg;
+static void
+_evhtp_thread_exit(evthr_t * thr, void * arg) {
+    evhtp_t * htp = (evhtp_t *)arg;
+
+    if (htp->thread_exit_cb) {
+        htp->thread_exit_cb(htp, thr, htp->thread_cbarg);
+    }
+}
+
+static int
+_evhtp_use_threads(evhtp_t * htp,
+                   evhtp_thread_init_cb init_cb,
+                   evhtp_thread_exit_cb exit_cb,
+                   int nthreads, void * arg) {
+    if (htp == NULL) {
+        return -1;
+    }
+
+    htp->thread_cbarg   = arg;
+    htp->thread_init_cb = init_cb;
+    htp->thread_exit_cb = exit_cb;
 
 #ifndef EVHTP_DISABLE_SSL
     evhtp_ssl_use_threads();
 #endif
 
-    if (!(htp->thr_pool = evthr_pool_new(nthreads, _evhtp_thread_init, htp))) {
+    if (!(htp->thr_pool = evthr_pool_wexit_new(nthreads,
+                                               _evhtp_thread_init,
+                                               _evhtp_thread_exit, htp))) {
         return -1;
     }
 
     evthr_pool_start(htp->thr_pool);
 
     return 0;
+}
+
+int
+evhtp_use_threads(evhtp_t * htp, evhtp_thread_init_cb init_cb,
+                  int nthreads, void * arg) {
+    return _evhtp_use_threads(htp, init_cb, NULL, nthreads, arg);
+}
+
+int
+evhtp_use_threads_wexit(evhtp_t * htp,
+                        evhtp_thread_init_cb init_cb,
+                        evhtp_thread_exit_cb exit_cb,
+                        int nthreads, void * arg) {
+    return _evhtp_use_threads(htp, init_cb, exit_cb, nthreads, arg);
 }
 
 #endif
@@ -4420,3 +4479,4 @@ unsigned int
 evhtp_request_status(evhtp_request_t * r) {
     return htparser_get_status(r->conn->parser);
 }
+
