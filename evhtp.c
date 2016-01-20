@@ -1429,7 +1429,8 @@ _evhtp_request_parser_headers(htparser * p) {
         return -1;
     }
     if (evhtp_unlikely(c->request->method == htp_method_HEAD &&
-                htparser_get_type(p) == htp_type_response)) { 
+                c->type == evhtp_type_client)) { 
+	    evhtp_assert(htparser_get_type(p) == htp_type_response);
         return 1; /* HEAD, skip response body */
     }
 
@@ -1844,8 +1845,10 @@ _evhtp_connection_readcb(evbev_t * bev, void * arg) {
     } else if (htparser_get_error(c->parser) != htparse_error_none) {
         evhtp_connection_free(c);
     } else if (nread < avail) {
-        /* we still have more data to read (piped request probably) */
-        evhtp_connection_resume(c);
+	    if (c->type == evhtp_type_server) {
+            /* we still have more data to read (piped request probably) */
+            evhtp_connection_resume(c);
+	    }
     }
 } /* _evhtp_connection_readcb */
 
