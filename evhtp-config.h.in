@@ -13,6 +13,22 @@ extern "C" {
 # endif
 #endif
 
+#ifdef WIN32
+#  define NO_SYS_UN 1
+#  define NO_STRNDUP 1
+#  ifdef _MSC_VER
+#    define inline __inline
+#    define ssize_t int
+#    define strcasecmp stricmp
+#    define strncasecmp strnicmp
+#    define snprintf _snprintf
+#  else
+#    define NO_STRNLEN 1
+#  endif
+#  if defined(__MINGW32__)
+#    define IPV6_V6ONLY 27
+#  endif
+#endif
 
 #if defined(_MSC_VER) && _MSC_VER >= 1500 // MSVC 2008
 #  define DEPRECATED(message) __declspec(deprecated(message))

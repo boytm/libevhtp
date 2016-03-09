@@ -864,8 +864,8 @@ EVHTP_EXPORT int evhtp_bind_sockaddr(evhtp_t * htp, struct sockaddr *,
  *
  * @return
  */
-EVHTP_EXPORT int evhtp_use_threads(evhtp_t *, evhtp_thread_init_cb, int nthreads, void *)
-    DEPRECATED("will take on the syntax of evhtp_use_threads_wexit");
+DEPRECATED("will take on the syntax of evhtp_use_threads_wexit")
+EVHTP_EXPORT int evhtp_use_threads(evhtp_t *, evhtp_thread_init_cb, int nthreads, void *);
 
 /**
  * @brief Temporary function which will be renamed evhtp_use_threads in the

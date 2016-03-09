@@ -3,9 +3,9 @@
 #include <stdint.h>
 #include <errno.h>
 #include <signal.h>
-#include <strings.h>
 #include <inttypes.h>
 #ifndef WIN32
+#include <strings.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>

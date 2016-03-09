@@ -5,6 +5,9 @@
 extern "C" {
 #endif
 
+#if _MSC_VER <= 1800 /* VC++ 2013 */
+#       define __func__ __FUNCTION__
+#endif
 
 #if defined __GNUC__ || defined __llvm__
 #       define evhtp_likely(x)         __builtin_expect(!!(x), 1)
