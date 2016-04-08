@@ -1289,7 +1289,7 @@ EVHTP_EXPORT evbev_t * evhtp_request_get_bev(evhtp_request_t * request);
  * @brief let a user take ownership of the underlying bufferevent and free
  *        all other underlying resources.
  *
- * Warning: this will free all evhtp_connection/request structures, remove all
+ * Warning: this will not free any evhtp_connection/request structures, but remove all
  * associated hooks and reset the bufferevent to defaults, i.e., disable
  * EV_READ, and set all callbacks to NULL.
  *
@@ -1298,6 +1298,7 @@ EVHTP_EXPORT evbev_t * evhtp_request_get_bev(evhtp_request_t * request);
  * @return underlying connections bufferevent.
  */
 EVHTP_EXPORT evbev_t * evhtp_connection_take_ownership(evhtp_connection_t * connection);
+EVHTP_EXPORT evbev_t * evhtp_request_take_ownership(evhtp_request_t * request);
 
 
 /**
