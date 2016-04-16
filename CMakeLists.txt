@@ -235,11 +235,7 @@ else()
 	set(LIBEVENT_PTHREADS_LIBRARY "")
 endif(NOT ${LIBEVENT_PTHREADS_FOUND})
 
-include_directories(
-	${CMAKE_CURRENT_BINARY_DIR}
-	${CMAKE_CURRENT_BINARY_DIR}/compat
-	${CMAKE_CURRENT_SOURCE_DIR}
-	${ONIG_INCLUDE_DIR}
+include_directories(SYSTEM
 	${OPENSSL_INCLUDE_DIR}
 	${LIBEVENT_INCLUDE_DIR}
 )
@@ -300,6 +296,13 @@ configure_file(
 
 add_library(evhtp ${EVHTP_LIBTYPE} ${LIBEVHTP_SOURCES} ${ONIG_SOURCES})
 target_link_libraries(evhtp ${LIBEVHTP_EXTERNAL_LIBS})
+target_include_directories(evhtp 
+	PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
+	PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/compat
+	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+	PUBLIC ${ONIG_INCLUDE_DIR}
+)
+
 
 if (EVHTP_BUILD_SHARED)
 		set_target_properties(evhtp PROPERTIES SOVERSION "${PROJECT_VERSION}")
