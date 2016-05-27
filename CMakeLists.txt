@@ -1,13 +1,16 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required (VERSION 2.8.11)
 project(libevhtp)
 
 set(PROJECT_MAJOR_VERSION 1)
 set(PROJECT_MINOR_VERSION 2)
 set(PROJECT_PATCH_VERSION 11)
 set(PROJECT_VERSION      ${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT_PATCH_VERSION})
+add_definitions(-DPROJECT_VERSION=${PROJECT_VERSION})
 
-set(CMAKE_C_FLAGS         "${CMAKE_C_FLAGS} -DPROJECT_VERSION=${PROJECT_VERSION} -Wall")
-set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG} -O0 -ggdb3")
+if(NOT MSVC)
+    set(CMAKE_C_FLAGS         "${CMAKE_C_FLAGS} -Wall")
+    set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG} -O0 -ggdb3")
+endif()
 
 SET(CMAKE_BUILD_TYPE Release CACHE STRING "default to Release")
 
@@ -269,7 +272,11 @@ if (NOT EVHTP_DISABLE_EVTHR)
 endif(NOT EVHTP_DISABLE_EVTHR)
 
 IF (WIN32)
-	add_definitions(-DWIN32 -march=i486)
+	if(NOT MSVC)
+		add_definitions(-march=i486)
+	endif()
+
+	add_definitions(-DWIN32)
 	find_library (LIB_WS32 ws2_32)
 	set (SYS_LIBS ${SYS_LIBS} ${LIB_WS32})
 ELSE ()
