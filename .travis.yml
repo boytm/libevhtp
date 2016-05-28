@@ -4,6 +4,15 @@ compiler:
            - clang
 
 sudo: required
+
+addons:
+  apt:
+    sources:
+        - george-edison55-precise-backports # cmake 3.2.3 / doxygen 1.8.3
+    packages:
+        - cmake
+        - cmake-data
+
 iinstall:
         - sudo apt-get update -qq
         - sudo apt-get install libevent-dev
