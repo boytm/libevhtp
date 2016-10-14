@@ -1654,7 +1654,7 @@ _evhtp_create_reply(evhtp_request_t * request, evhtp_res code) {
         goto check_proto;
     }
 
-    if (request->chunked == 0) {
+    if (request->chunked == 0 && evhtp_response_needs_body(code, request->method)) {
         /* add extra headers (like content-length/type) if not already present */
 
         if (!evhtp_header_find(request->headers_out, "Content-Length")) {
@@ -1868,7 +1868,7 @@ _evhtp_connection_writecb(evbev_t * bev, void * arg) {
         return;
     }
 
-    if (evhtp_unlikely(c->waiting == 1)) {
+    if (evhtp_unlikely(c->waiting == 1 && c->request->finished == 1)) {
         c->waiting = 0;
 
         bufferevent_enable(bev, EV_READ);
