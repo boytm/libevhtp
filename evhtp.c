@@ -1428,10 +1428,10 @@ _evhtp_request_parser_headers(htparser * p) {
     if (c->request->status != EVHTP_RES_OK) {
         return -1;
     }
-    if (evhtp_unlikely(c->request->method == htp_method_HEAD &&
-                c->type == evhtp_type_client)) { 
+    if (evhtp_unlikely(c->type == evhtp_type_client && 
+            !evhtp_response_needs_body(htparser_get_status(p), c->request->method))) { 
 	    evhtp_assert(htparser_get_type(p) == htp_type_response);
-        return 1; /* HEAD, skip response body */
+        return 1; /* HEAD/204/304 etc. skip response body */
     }
 
     if (c->type == evhtp_type_server && c->htp->disable_100_cont == 0) {
