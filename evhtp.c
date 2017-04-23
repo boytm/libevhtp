@@ -1958,22 +1958,7 @@ _evhtp_connection_eventcb(evbev_t * bev, short events, void * arg) {
 #endif
 
     if (events == (BEV_EVENT_EOF | BEV_EVENT_READING)) {
-        if (errno == EAGAIN) {
-            /* libevent will sometimes recv again when it's not actually ready,
-             * this results in a 0 return value, and errno will be set to EAGAIN
-             * (try again). This does not mean there is a hard socket error, but
-             * simply needs to be read again.
-             *
-             * but libevent will disable the read side of the bufferevent
-             * anyway, so we must re-enable it.
-             */
-            bufferevent_enable(bev, EV_READ);
-            errno = 0;
-
-            return;
-        } else {
-            htparser_run(c->parser, &request_psets, (const char *)NULL, 0);
-        }
+        htparser_run(c->parser, &request_psets, (const char *)NULL, 0);
     }
 
     c->error     = 1;
