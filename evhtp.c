@@ -3938,9 +3938,14 @@ evhtp_ssl_init(evhtp_t * htp, evhtp_ssl_cfg_t * cfg) {
             break;
     }     /* switch */
 
-    SSL_CTX_use_certificate_file(htp->ssl_ctx, cfg->pemfile, SSL_FILETYPE_PEM);
+    SSL_CTX_use_certificate_chain_file(htp->ssl_ctx, cfg->pemfile);
     SSL_CTX_use_PrivateKey_file(htp->ssl_ctx,
                                 cfg->privfile ? cfg->privfile : cfg->pemfile, SSL_FILETYPE_PEM);
+    if (!SSL_CTX_check_private_key(htp->ssl_ctx)) {
+        fprintf(stderr, "Private key does not match the certificate public key\n");
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
 
     SSL_CTX_set_session_id_context(htp->ssl_ctx,
                                    (void *)&session_id_context,
