@@ -1941,6 +1941,9 @@ _evhtp_connection_eventcb(evbev_t * bev, short events, void * arg) {
                               _evhtp_connection_readcb,
                               _evhtp_connection_writecb,
                               _evhtp_connection_eventcb, c);
+	    c->resume_ev = event_new(bufferevent_get_base(bev), -1, EV_PERSIST,
+					      _evhtp_connection_resumecb, c);
+	    event_add(c->resume_ev, NULL);
         }
 
         return;
@@ -2049,7 +2052,7 @@ end:
 
     evhtp_connection_set_timeouts(connection, c_recv_timeo, c_send_timeo);
 
-    connection->resume_ev = event_new(evbase, -1, EV_READ | EV_PERSIST,
+    connection->resume_ev = event_new(evbase, -1, EV_PERSIST,
                                       _evhtp_connection_resumecb, connection);
     event_add(connection->resume_ev, NULL);
 
@@ -4315,6 +4318,10 @@ evhtp_connection_new_from_bev(evbev_t * bev) {
 
 		bufferevent_enable(conn->bev, EV_READ);
 	}
+	conn->resume_ev = event_new(bufferevent_get_base(bev), -1, EV_PERSIST,
+				      _evhtp_connection_resumecb, conn);
+	event_add(conn->resume_ev, NULL);
+
 
 	return conn;
 }
