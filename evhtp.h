@@ -301,7 +301,8 @@ struct evhtp_s {
                enable_reuseport    : 1,
                enable_nodelay      : 1,
                enable_defer_accept : 1,
-               pad                 : 4;
+               disable_parse_query_body : 1,
+               pad                 : 3;
 
     int parser_flags;                   /**< default query flags to alter 'strictness' (see EVHTP_PARSE_QUERY_FLAG_*) */
 
