@@ -113,7 +113,13 @@ ll_on_url(llhttp_t * p, const char * at, size_t len) {
     const char * cur = at;
     const char * end = at + len;
 
-    const char * colon_slash_slash = memmem(at, len, "://", 3);
+    const char * colon_slash_slash = NULL;
+    for (size_t i = 0; i + 2 < len; i++) {
+        if (at[i] == ':' && at[i+1] == '/' && at[i+2] == '/') {
+            colon_slash_slash = at + i;
+            break;
+        }
+    }
     if (colon_slash_slash) {
         h->scheme_offset = at;
         h->scheme_len = colon_slash_slash - at;
@@ -428,6 +434,7 @@ htparser_new(void) {
 
 size_t
 htparser_run(htparser * p, htparse_hooks * hooks, const char * data, size_t len) {
+    if (p == NULL) return 0;
     p->hooks = hooks;
     p->bytes_read = 0;
 
@@ -442,7 +449,13 @@ htparser_run(htparser * p, htparse_hooks * hooks, const char * data, size_t len)
     llhttp_errno_t err = llhttp_execute(&p->llparser, data, len);
 
     const char * error_pos = llhttp_get_error_pos(&p->llparser);
-    size_t nread = error_pos - data;
+    size_t nread;
+
+    if (error_pos == NULL) {
+        nread = len;
+    } else {
+        nread = error_pos - data;
+    }
 
     p->bytes_read = nread;
     p->total_bytes_read += nread;
