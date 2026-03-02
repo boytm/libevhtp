@@ -1,20 +1,16 @@
-cmake_minimum_required (VERSION 2.8.11)
+cmake_minimum_required (VERSION 3.10)
 project(libevhtp)
 
 set(PROJECT_MAJOR_VERSION 1)
 set(PROJECT_MINOR_VERSION 2)
 set(PROJECT_PATCH_VERSION 11)
 set(PROJECT_VERSION      ${PROJECT_MAJOR_VERSION}.${PROJECT_MINOR_VERSION}.${PROJECT_PATCH_VERSION})
-add_definitions(-DPROJECT_VERSION=${PROJECT_VERSION})
 
-if(MSVC)
-    add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS)
-else()
-    set(CMAKE_C_FLAGS         "${CMAKE_C_FLAGS} -Wall")
+if(NOT MSVC)
     set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG} -O0 -ggdb3")
 endif()
 
-SET(CMAKE_BUILD_TYPE Release CACHE STRING "default to Release")
+set(CMAKE_BUILD_TYPE Release CACHE STRING "default to Release")
 
 # will use later for htexpress API
 # add_executable(lambda-pp lambda-pp.c)
@@ -91,11 +87,11 @@ check_c_compiler_flag(-fvisibility=hidden EVHTP_HAS_VISIBILITY_HIDDEN)
 check_c_compiler_flag(-std=c99 EVHTP_HAS_C99)
 
 if (EVHTP_HAS_C99)
-	add_definitions(-DEVHTP_HAS_C99)
+	set(CMAKE_C_STANDARD 99)
 endif()
 
 if (EVHTP_HAS_VISIBILITY_HIDDEN)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+	set(CMAKE_C_VISIBILITY_PRESET hidden)
 endif()
 
 if (NOT HAVE_SYS_TREE)
@@ -108,34 +104,10 @@ if (NOT HAVE_SYS_QUEUE)
 			${CMAKE_CURRENT_BINARY_DIR}/compat/sys/queue.h)
 endif(NOT HAVE_SYS_QUEUE)
 
-if (NOT HAVE_STRNDUP)
-	add_definitions(-DNO_STRNDUP)
-endif()
-
-if (NOT HAVE_STRNLEN)
-	add_definitions(-DNO_STRNLEN)
-endif()
-
-if (NOT HAVE_SYS_UN)
-	add_definitions(-DNO_SYS_UN)
-endif(NOT HAVE_SYS_UN)
-
-if (HOST_BIG_ENDIAN)
-	add_definitions(-DHOST_BIG_ENDIAN)
-endif()
-
 # Test 32/64 bits
-if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
-	add_definitions(-DEVHTP_SYS_ARCH=64)
-elseif("${CMAKE_SIZEOF_VOID_P}" EQUAL "4")
-	add_definitions(-DEVHTP_SYS_ARCH=32)
-else()
+if(NOT "${CMAKE_SIZEOF_VOID_P}" EQUAL "8" AND NOT "${CMAKE_SIZEOF_VOID_P}" EQUAL "4")
 	message(ERROR "Unable to determine architecture")
 endif()
-
-if (EVHTP_USE_DEFER_ACCEPT)
-	add_definitions(-DUSE_DEFER_ACCEPT)
-endif(EVHTP_USE_DEFER_ACCEPT)
 
 SET(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -163,10 +135,6 @@ if (NOT OPENSSL_FOUND)
 	set (OPENSSL_INCLUDE_DIR      "")
 	set (OPENSSL_LIBRARIES        "")
 	set (LIBEVENT_OPENSSL_LIBRARY "")
-elseif(APPLE)
-	# darwin based hosts have deprecated normal openssl functions, which is
-	# annoying to see warnings, for now, just ignore them.
-	add_definitions(-Wno-deprecated-declarations)
 endif()
 
 if (NOT EVHTP_DISABLE_REGEX)
@@ -274,11 +242,6 @@ if (NOT EVHTP_DISABLE_EVTHR)
 endif(NOT EVHTP_DISABLE_EVTHR)
 
 IF (WIN32)
-	if(NOT MSVC)
-		add_definitions(-march=i486)
-	endif()
-
-	add_definitions(-DWIN32)
 	find_library (LIB_WS32 ws2_32)
 	set (SYS_LIBS ${SYS_LIBS} ${LIB_WS32})
 ELSE ()
@@ -304,7 +267,7 @@ configure_file(
 	${CMAKE_CURRENT_BINARY_DIR}/evhtp-config.h)
 
 add_library(evhtp ${EVHTP_LIBTYPE} ${LIBEVHTP_SOURCES} ${ONIG_SOURCES})
-target_link_libraries(evhtp ${LIBEVHTP_EXTERNAL_LIBS})
+target_link_libraries(evhtp PRIVATE ${LIBEVHTP_EXTERNAL_LIBS})
 target_include_directories(evhtp 
 	PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
 	PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/compat
@@ -312,12 +275,65 @@ target_include_directories(evhtp
 	PUBLIC ${ONIG_INCLUDE_DIR}
 )
 
+target_compile_definitions(evhtp PRIVATE "PROJECT_VERSION=${PROJECT_VERSION}")
+
+if(WIN32)
+	target_compile_definitions(evhtp PRIVATE WIN32)
+endif()
+
+if(MSVC)
+    target_compile_definitions(evhtp PRIVATE _WINSOCK_DEPRECATED_NO_WARNINGS _CRT_SECURE_NO_WARNINGS)
+else()
+    target_compile_options(evhtp PRIVATE -Wall)
+endif()
+
+if (EVHTP_THR_SHARED_PIPE)
+	target_compile_definitions(evhtp PRIVATE EVTHR_SHARED_PIPE)
+endif()
+
+if (EVHTP_HAS_C99)
+	target_compile_definitions(evhtp PRIVATE EVHTP_HAS_C99)
+endif()
+
+if (NOT HAVE_STRNDUP)
+	target_compile_definitions(evhtp PRIVATE NO_STRNDUP)
+endif()
+
+if (NOT HAVE_STRNLEN)
+	target_compile_definitions(evhtp PRIVATE NO_STRNLEN)
+endif()
+
+if (NOT HAVE_SYS_UN)
+	target_compile_definitions(evhtp PRIVATE NO_SYS_UN)
+endif()
+
+if (HOST_BIG_ENDIAN)
+	target_compile_definitions(evhtp PRIVATE HOST_BIG_ENDIAN)
+endif()
+
+if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
+	target_compile_definitions(evhtp PRIVATE EVHTP_SYS_ARCH=64)
+elseif("${CMAKE_SIZEOF_VOID_P}" EQUAL "4")
+	target_compile_definitions(evhtp PRIVATE EVHTP_SYS_ARCH=32)
+endif()
+
+if (EVHTP_USE_DEFER_ACCEPT)
+	target_compile_definitions(evhtp PRIVATE USE_DEFER_ACCEPT)
+endif()
+
+if(APPLE AND NOT EVHTP_DISABLE_SSL)
+	target_compile_options(evhtp PRIVATE -Wno-deprecated-declarations)
+endif()
+
+if(WIN32 AND NOT MSVC)
+	target_compile_options(evhtp PRIVATE -march=i486)
+endif()
+
 
 if (EVHTP_BUILD_SHARED)
 		set_target_properties(evhtp PROPERTIES SOVERSION "${PROJECT_VERSION}")
 endif()
 
-add_subdirectory(tools)
 add_subdirectory(examples)
 
 if (NOT LIB_INSTALL_DIR)

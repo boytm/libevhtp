@@ -19,6 +19,10 @@ target_link_libraries(test_client evhtp ${LIBEVHTP_EXTERNAL_LIBS} ${SYS_LIBS})
 target_link_libraries(test_query  evhtp ${LIBEVHTP_EXTERNAL_LIBS} ${SYS_LIBS})
 target_link_libraries(test_perf   evhtp ${LIBEVHTP_EXTERNAL_LIBS} ${SYS_LIBS})
 
-add_dependencies(examples test test_basic test_vhost test_client test_proxy test_query test_perf)
+add_dependencies(examples test test_basic test_vhost test_client test_query test_perf)
+
+if (NOT EVHTP_DISABLE_EVTHR)
+	add_dependencies(examples test_proxy)
+endif()
 
 
