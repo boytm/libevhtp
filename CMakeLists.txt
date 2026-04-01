@@ -257,7 +257,7 @@ if (NOT ${LIBEVENT_OPENSSL_FOUND})
 	set (EVHTP_DISABLE_SSL ON)
 endif(NOT ${LIBEVENT_OPENSSL_FOUND})
 
-set(LIBEVHTP_SOURCES evhtp.c evhtp_numtoa.c htparse.c)
+set(LIBEVHTP_SOURCES evhtp.c evhtp_numtoa.c htparse.c llhttp.c llhttp_api.c llhttp_http.c)
 
 if (EVHTP_USE_JEMALLOC)
 		set(LIBEVHTP_EXTERNAL_LIBS ${LIBEVHTP_EXTERNAL_LIBS} jemalloc)

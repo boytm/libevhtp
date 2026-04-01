@@ -3,6 +3,7 @@
 
 #include "evhtp-config.h"
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,4 +124,3 @@ EVHTP_EXPORT htparser     * htparser_new(void);
 #endif
 
 #endif
-
